@@ -1,6 +1,6 @@
-import requests, sys, argparse
-from os.path import exists
+import requests, sys, argparse, csv, os.path
 from bs4 import BeautifulSoup
+from datetime import datetime
 
 parser = argparse.ArgumentParser(
     prog = 'weather_scrape',
@@ -86,12 +86,37 @@ def make_dict(datapart, coarseness):  #erstellt das dict, das die Daten aus den 
             #print(mydict) 
     return mydict, titlelist
 
+def cleandict(datadict):
+    # TODO: Hier will ich: Eine Spalte für den Abruf-Zeitpunkt einfügen
+    # und alle Einheiten aussortieren. Wobei ich diesen Säuberungsschritt am besten schon vorher mache, bevor ich das Dict überhaupt erstelle.
+    unitlist=[]
+    print ("no cleaning done so far")
+    return datadict, unitlist
+
+
+def writecsv(titlelist, datadict, coarseness):
+    #TODO: Überlegen welches Zeitintervall für die Benennung der CSVs gewählt werden soll? Tage?
+    if (coarseness=="hourly"):
+        coarseind=""
+    elif (coarseness=="sixhourly"):
+        coarseind="_6h"
+
+    timestamp=datetime.now().strftime("%Y-%m-%d") #strftime("%Y-%m-%dT%Hh%M")
+    csvname=f"./data/weather_data{coarseind}_{timestamp}.csv"
+    addtitle= not os.path.isfile(csvname)
+    with open(csvname, 'a', newline='') as outcsv:  # Schreib-Modus hier ist 'w' (write), wähle 'a' (append), wenn du an vorhandene CSV nur etwas dranhängen willst
+        weatherwriter=csv.writer(outcsv, delimiter=';', quotechar="|")
+        if(addtitle):
+            weatherwriter.writerow(titlelist)
+        for key in datadict:
+            weatherwriter.writerow(datadict[key])
+    print(f"got to print {coarseness}")
 
 def runscrape(dummymode=False):
     if not dummymode:
         response = online_request()
     else:
-        if exists('scrape_result.html'):
+        if os.path.exists('scrape_result.html'):
             with open('scrape_result.html', 'r') as outputfile:
                 response = outputfile.read()
         else:
@@ -99,17 +124,15 @@ def runscrape(dummymode=False):
             with open('scrape_result.html', 'w') as outputfile:
                 outputfile.write(response)
     datapart = extract_data_part(response)
-    coarseness = "sixhourly" # gibt an ob die grobe oder feine Zeiteinteilung untersucht wird.
-# Hier sollte ich eine Unterscheidung für beide Varianten machen
-    (coarsedict,titlelist)=make_dict(datapart, coarseness)
-    print(titlelist)
-    print(coarsedict)
 
-    coarseness = "hourly"
+    for coarseness in ["sixhourly", "hourly"]:    # gibt an ob die grobe oder feine Zeiteinteilung untersucht wird.
+    # Hier sollte ich eine Unterscheidung für beide Varianten machen
+        (datadict,titlelist)=make_dict(datapart, coarseness)
+        (datadict, unitlist) = cleandict(datadict)
+        print(titlelist)
+        print(datadict)
+        writecsv(titlelist, datadict, coarseness)
 
-    (finedict,titlelist)= make_dict(datapart, coarseness)
-    print(titlelist)
-    print(finedict)
  
 
 def main(dummymode=False):
